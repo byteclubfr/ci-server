@@ -50,11 +50,9 @@ fs.readdirSync(path.join(__dirname, 'projects'))
 
   var projectFilter = config.filter || {};
 
-  var finished = function finished () {
-    console.error(project, arguments);
-  };
-
   config.processes.forEach(function (process) {
+    process = process || {};
+    process.projectDir = path.join(__dirname, 'projects', project);
     process.filter = merge(projectFilter, process.filter || {});
     var tests = getMethods(process, 'test', 'test');
     var passActions = getMethods(process, 'pass', 'action');
@@ -62,33 +60,46 @@ fs.readdirSync(path.join(__dirname, 'projects'))
     var errorActions = getMethods(process, 'error', 'action');
 
     // Prepare working directory before tests
-    tests.unshift(prepareWorkingDirectory.bind(null, project, process));
+    tests.unshift(prepareWorkingDirectory.bind(null, process));
 
     gith(process.filter).on(process.event || 'all', function (payload) {
-      async.series(tests.map(function (test) {
-        return test.bind(null, payload);
-      }), function (err, results) {
+
+      var output = '';
+      var appendOutput = function (params) {
+        return function (fn) {
+          return function (cb) {
+            fn.apply(null, params.concat(function () {
+              var args = Array.prototype.slice.call(arguments);
+              output += args.pop() + '\n';
+              cb.apply(null, args);
+            }));
+          };
+        };
+      };
+
+      var finished = function finished () {
+        console.error('FINISHED', project, output, arguments);
+      };
+
+      async.series(tests.map(appendOutput([payload])), function (err, results) {
         var actions;
         if (err) {
           actions = errorActions;
         } else {
           var pass = results.some(function (result) {
-            return Array.isArray(result) ? !!result[0] : !!result;
+            return false !== (Array.isArray(result) ? result[0] : result);
           });
           actions = pass ? passActions : failActions;
         }
-        async.series(actions.map(function (action) {
-          return action.bind(null, payload, err, results);
-        }), function (err, results) {
+        async.series(actions.map(appendOutput([payload, err, results])), function (err, results) {
           if (err) {
-            async.series(errorActions.map(function (action) {
-              return action.bind(null, payload, err, results);
-            }), finished);
+            async.series(errorActions.map(appendOutput([payload, err, results])), finished);
           } else {
             finished();
           }
         });
       });
+
     });
   });
 
@@ -96,24 +107,17 @@ fs.readdirSync(path.join(__dirname, 'projects'))
 });
 
 
-var spawn = require('child_process').spawn;
+var shell_exec = require('./lib/utils').shell_exec;
 
-function prepareWorkingDirectory (project, config, payload, cb) {
-  var dir = path.join(__dirname, 'projects', project, 'git');
+function prepareWorkingDirectory (config, payload, cb) {
+  var dir = path.join(config.projectDir, 'git');
 
   var output = '';
   var doSpawn = function (command, args, cb) {
-    var cwd = process.cwd();
-    process.chdir(dir);
-    var done = function (err) {
-      process.chdir(cwd);
+    shell_exec(dir, command, args, function (err, content) {
+      output += content + '\n';
       cb(err);
-    };
-    var cmd = spawn(command, args);
-    cmd.stdout.on('data', function (data) { output += 'stdout: ' + data; });
-    cmd.stderr.on('data', function (data) { output += 'stderr: ' + data; });
-    cmd.on('error', function (err) { done(err); });
-    cmd.on('exit', function (code) { done(code ? new Error('Command "' + command + ' \'' + args.join('\' \'') + '\' failed with status ' + code) : null); });
+    });
   };
 
   var sha = payload.sha || payload.branch; // only in "push" // TODO other events
@@ -153,6 +157,6 @@ function prepareWorkingDirectory (project, config, payload, cb) {
       doSpawn('git', ['checkout', sha], cb);
     }
   ], function (err) {
-    cb(err, output);
+    cb(err, true, output);
   });
 }
