@@ -1,0 +1,19 @@
+[{}]
+	{
+		"filter": {
+			"event": "push",
+			"branch": "master"
+		},
+		"test": ["test"],
+		"pass": ["notify", "deploy"],
+		"fail": ["notify"]
+	},
+	{
+		"filter": {
+			"event": "pull_request",
+		},
+		"test": ["test"],
+		"pass": ["notify", "status"],
+		"fail": ["notify", "status"]
+	}
+]

@@ -1,0 +1,7 @@
+#!/bin/sh
+
+cd /path/to/project && \
+	npm install && \
+	npm update && \
+	npm test && \
+echo "OK"

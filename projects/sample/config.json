@@ -1,0 +1,27 @@
+{
+	"enabled": false,
+	"filter": {
+		"repo": "user/project"
+	},
+	"processes": [
+		{
+			"filter": {
+				"event": "push",
+				"branch": "master"
+			},
+			"test": ["test"],
+			"pass": ["notify", "deploy"],
+			"fail": ["notify"],
+			"error": ["notify"]
+		},
+		{
+			"filter": {
+				"event": "pull_request"
+			},
+			"test": ["test"],
+			"pass": ["notify", "status"],
+			"fail": ["notify", "status"],
+			"error": ["notify", "status"]
+		}
+	]
+}

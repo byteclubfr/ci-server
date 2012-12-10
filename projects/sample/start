@@ -1,0 +1,31 @@
+#!/bin/sh
+
+PIDFILE="$(dirname "$0")/PID"
+
+if [ -f $PIDFILE ]; then
+	echo "Found PIDFILE, server already running?" >&2
+	if (kill -0 $(cat $PIDFILE) &> /dev/null); then
+		echo "Server already running!" >&2
+		exit 1
+	else
+		echo "Server not running: cleanup PIDFILE" >&2
+		rm -f $PIDFILE
+	fi
+fi
+
+cd /path/to/project
+
+NODE_ENV=production nohup node app.js &> log/production.log &
+PID=$!
+
+sleep 1
+
+if (kill -0 $PID &> /dev/null); then
+	echo $PID > $PIDFILE
+	echo "Server started successfully (PID $PID)" >&2
+	exit 0
+else
+	echo "Server failed starting (check $(pwd)/log/production.log, 30 last lines below…)" >&2
+	tail -n 30 log/production.log >&2
+	exit 2
+fi
