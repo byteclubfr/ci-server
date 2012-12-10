@@ -27,7 +27,7 @@ function getActions (config, option) {
         utils.shSeries.bind(null, config, payload, config.projectDir, action, cb);
       };
     }
-    return foo.bind.bind(null, option, config);
+    return foo.bind(null, option, config);
   });
 }
 
@@ -74,12 +74,13 @@ fs.readdirSync(path.join(__dirname, 'projects'))
       var output = new Buffer(0);
       var appendOutput = function (params) {
         return function (fn) {
+          fn = fn.bind(null, params);
           return function (cb) {
-            fn.apply(null, params.concat(function () {
+            fn(function () {
               var args = Array.prototype.slice.call(arguments);
               output = Buffer.concat([output, args.pop(), new Buffer('\n')]);
               cb.apply(null, args);
-            }));
+            });
           };
         };
       };
