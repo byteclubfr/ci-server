@@ -4,9 +4,9 @@
 		"repo": "user/project"
 	},
 	"scripts": {
-		"build": ["npm install", "npm update"],
+		"build": "npm install && npm update",
 		"test": "npm test",
-		"deploy": ["cd /path/to/project && $GIT_UPDATE", "$PROJECT/stop", "$PROJECT/start"]
+		"deploy": "cd /path/to/project && $GIT_UPDATE && $PROJECT/stop && $PROJECT/start"
 	},
 	"processes": [
 		{

@@ -18,13 +18,13 @@ function getActions (config, option) {
   if (!Array.isArray(names)) names = [names];
   return names.map(function (action) {
     var foo;
-    if (typeof action === 'string' && action.substring(0, 1) === '@') {
+    if (action.substring(0, 1) === '@') {
       foo = allActions[action.substring(1)] || function (type, config, payload, err, results, cb) {
         cb(new Error('Configuration error: unknown action "' + action + '"'));
       };
     } else {
       foo = function (type, config, payload, err, results, cb) {
-        utils.shSeries.bind(null, config, payload, config.projectDir, action, cb);
+        utils.sh(config.projectDir, utils.replaceShellTokens(config, payload, action), cb);
       };
     }
     return foo.bind(null, option, config);
@@ -93,24 +93,16 @@ fs.readdirSync(path.join(__dirname, 'projects'))
         prepareWorkingDirectory.bind(null, proc, payload),
         function test (cb) {
           var dir = path.join(proc.projectDir, 'git');
-          utils.shSeries(proc, payload, dir, scripts.test || 'echo "NO TEST DEFINED"', function (err, content) {
+          utils.sh(dir, utils.replaceShellTokens(proc, payload, scripts.test || 'echo "NO TEST DEFINED"'), function (err, content) {
             output = Buffer.concat([output, content, new Buffer('\n')]);
             cb(err);
           });
         }
       ], function (err) {
-        var actions;
-        if (err) {
-          actions = errorActions;
-        } else {
-          var pass = results.some(function (result) {
-            return false !== (Array.isArray(result) ? result[0] : result);
-          });
-          actions = pass ? passActions : failActions;
-        }
+        var actions = err ? failActions : passActions;
         async.series(actions.map(appendOutput([payload, err])), function (err, results) {
           if (err) {
-            async.series(errorActions.map(appendOutput([payload, err, results])), finished);
+            async.series(errorActions.map(appendOutput([payload, err])), finished);
           } else {
             finished();
           }
@@ -128,8 +120,8 @@ function prepareWorkingDirectory (config, payload, cb) {
   var dir = path.join(config.projectDir, 'git');
 
   var output = new Buffer(0);
-  var doSpawn = function (command, args, cb) {
-    utils.shSeries(config, payload, dir, [[command, args]], function (err, content) {
+  var doSpawn = function (command, cb) {
+    utils.sh(dir, utils.replaceShellTokens(config, payload, command), function (err, content) {
       output = Buffer.concat([output, content, new Buffer('\n')]);
       cb(err);
     });
@@ -152,7 +144,7 @@ function prepareWorkingDirectory (config, payload, cb) {
     function gitFetch (exists, cb) {
       if (exists) {
         output = Buffer.concat([output, new Buffer('>> Git repository: already cloned, fetch remote data…\n')]);
-        doSpawn('git', ['fetch', 'origin'], cb);
+        doSpawn('git fetch origin', cb);
       } else {
         output = Buffer.concat([output, new Buffer('>> Git repository: clone remote…\n')]);
         var url = payload.urls.repo; // Shoulw be common to all payloads
@@ -163,13 +155,13 @@ function prepareWorkingDirectory (config, payload, cb) {
             // Prefer the SSH git protocol, using deploy key
             url = url.replace(/^https?:\/\/(.*?)\//, 'git@$1:') + '.git';
           }
-          doSpawn('git', ['clone', url, dir], cb);
+          doSpawn('git clone ' + utils.shellArgs([url, dir]), cb);
         }
       }
     },
     function gitCheckout (cb) {
       output = Buffer.concat([output, new Buffer('>> Git repository: checkout ' + sha + '\n')]);
-      doSpawn('git', ['checkout', sha], cb);
+      doSpawn('git checkout ' + utils.shellArgs(sha), cb);
     }
   ], function (err) {
     cb(err, true, output);
