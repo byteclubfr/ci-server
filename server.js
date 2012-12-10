@@ -52,12 +52,14 @@ fs.readdirSync(path.join(__dirname, 'projects'))
   };
 
   config.processes.forEach(function (process) {
-    var tests = getMethods(config, config.test, 'test');
-    var passActions = getMethods(config, config.pass, 'action');
-    var failActions = getMethods(config, config.fail, 'action');
-    var errorActions = getMethods(config, config.error, 'action');
 
-    gith().on(process.event || 'all', function (payload) {
+    process.filter = merge(projectFilter, process.filter || {});
+    var tests = getMethods(process, process.test, 'test');
+    var passActions = getMethods(process, process.pass, 'action');
+    var failActions = getMethods(process, process.fail, 'action');
+    var errorActions = getMethods(process, process.error, 'action');
+
+    gith(process.filter).on(process.event || 'all', function (payload) {
       async.series(tests.map(function (test) {
         return test.bind(null, payload);
       }), function (err, results) {
