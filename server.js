@@ -92,7 +92,7 @@ fs.readdirSync(path.join(__dirname, 'projects'))
         prepareWorkingDirectory.bind(null, proc, payload),
         function test (cb) {
           var dir = path.join(proc.projectDir, 'git');
-          utils.shSeries(proc, payload, dir, scripts.test || 'echo "NO TEST DEFINED"', function (err, outputs) {
+          utils.shSeries(proc, payload, dir, scripts.test || 'echo "NO TEST DEFINED"', function (err, content) {
             output = Buffer.concat([output, content, new Buffer('\n')]);
             cb(err);
           });
@@ -107,7 +107,7 @@ fs.readdirSync(path.join(__dirname, 'projects'))
           });
           actions = pass ? passActions : failActions;
         }
-        async.series(actions.map(appendOutput([payload, err, results])), function (err, results) {
+        async.series(actions.map(appendOutput([payload, err])), function (err, results) {
           if (err) {
             async.series(errorActions.map(appendOutput([payload, err, results])), finished);
           } else {
