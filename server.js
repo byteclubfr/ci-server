@@ -64,13 +64,13 @@ fs.readdirSync(path.join(__dirname, 'projects'))
 
     gith(process.filter).on(process.event || 'all', function (payload) {
 
-      var output = '';
+      var output = new Buffer(0);
       var appendOutput = function (params) {
         return function (fn) {
           return function (cb) {
             fn.apply(null, params.concat(function () {
               var args = Array.prototype.slice.call(arguments);
-              output += args.pop() + '\n';
+              output = Buffer.concat([output, args.pop(), new Buffer('\n')]);
               cb.apply(null, args);
             }));
           };
@@ -112,10 +112,10 @@ var shell_exec = require('./lib/utils').shell_exec;
 function prepareWorkingDirectory (config, payload, cb) {
   var dir = path.join(config.projectDir, 'git');
 
-  var output = '';
+  var output = new Buffer(0);
   var doSpawn = function (command, args, cb) {
     shell_exec(dir, command, args, function (err, content) {
-      output += content + '\n';
+      output = Buffer.concat([output, content, new Buffer('\n')]);
       cb(err);
     });
   };
@@ -136,10 +136,10 @@ function prepareWorkingDirectory (config, payload, cb) {
     },
     function gitFetch (exists, cb) {
       if (exists) {
-        output += '>> Git repository: already cloned, fetch remote data…\n';
+        output = Buffer.concat([output, new Buffer('>> Git repository: already cloned, fetch remote data…\n')]);
         doSpawn('git', ['fetch', 'origin'], cb);
       } else {
-        output += '>> Git repository: clone remote…\n';
+        output = Buffer.concat([output, new Buffer('>> Git repository: clone remote…\n')]);
         var url = payload.urls.repo; // Shoulw be common to all payloads
         if (!url) {
           cb(new Error('Could not retrieve repository URL: cannot clone!'));
@@ -153,7 +153,7 @@ function prepareWorkingDirectory (config, payload, cb) {
       }
     },
     function gitCheckout (cb) {
-      output += '>> Git repository: checkout ' + sha + '\n';
+      output = Buffer.concat([output, new Buffer('>> Git repository: checkout ' + sha + '\n')]);
       doSpawn('git', ['checkout', sha], cb);
     }
   ], function (err) {
