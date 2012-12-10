@@ -3,25 +3,28 @@
 	"filter": {
 		"repo": "user/project"
 	},
+	"scripts": {
+		"build": ["npm install", "npm update"],
+		"test": "npm test",
+		"deploy": ["cd /path/to/project && $GIT_UPDATE", "$PROJECT/stop", "$PROJECT/start"]
+	},
 	"processes": [
 		{
 			"filter": {
 				"event": "push",
 				"branch": "master"
 			},
-			"test": ["test"],
-			"pass": ["notify", "deploy"],
-			"fail": ["notify"],
-			"error": ["notify"]
+			"pass": ["@notify", "@deploy"],
+			"fail": ["@notify"],
+			"error": ["@notify"]
 		},
 		{
 			"filter": {
 				"event": "pull_request"
 			},
-			"test": ["test"],
-			"pass": ["notify", "status"],
-			"fail": ["notify", "status"],
-			"error": ["notify", "status"]
+			"pass": ["@notify", "@status"],
+			"fail": ["@notify", "@status"],
+			"error": ["@notify", "@status"]
 		}
 	]
 }

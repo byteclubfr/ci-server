@@ -6,21 +6,28 @@ var async = require('async');
 
 var gith = require('gith').create(process.env.PORT || 9001);
 
-var allTests = require('./lib/tests');
+var utils = require('./lib/utils');
+
 var allActions = require('./lib/actions');
 
 console.debug = console.log;
 
-function getMethods (config, option, type) {
-  var methods = type === 'test' ? allTests : allActions;
-  var defaultName = type === 'test' ? 'pass' : 'noop';
-  var names = config[option] || [];
+
+function getActions (config, option) {
+  var names = config[option] || ['@noop'];
   if (!Array.isArray(names)) names = [names];
-  return names.map(function (name) {
-    var foo = methods[name || defaultName] || function (config, payload, cb) {
-      cb(new Error('Configuration error: unknown ' + type + ' "' + name + '"'));
-    };
-    return type === 'action' ? foo.bind(null, option, config) : foo.bind(null, config);
+  return names.map(function (action) {
+    var foo;
+    if (typeof action === 'string' && action.substring(0, 1) === '@') {
+      foo = allActions[action.substring(1)] || function (type, config, payload, err, results, cb) {
+        cb(new Error('Configuration error: unknown action "' + action + '"'));
+      };
+    } else {
+      foo = function (type, config, payload, err, results, cb) {
+        utils.shSeries.bind(null, config, payload, config.projectDir, action, cb);
+      };
+    }
+    return foo.bind.bind(null, option, config);
   });
 }
 
@@ -50,19 +57,19 @@ fs.readdirSync(path.join(__dirname, 'projects'))
 
   var projectFilter = config.filter || {};
 
-  config.processes.forEach(function (process) {
-    process = process || {};
-    process.projectDir = path.join(__dirname, 'projects', project);
-    process.filter = merge(projectFilter, process.filter || {});
-    var tests = getMethods(process, 'test', 'test');
-    var passActions = getMethods(process, 'pass', 'action');
-    var failActions = getMethods(process, 'fail', 'action');
-    var errorActions = getMethods(process, 'error', 'action');
+  config.processes.forEach(function (proc) {
+    proc = proc || {};
+    proc.projectDir = path.join(__dirname, 'projects', project);
+    proc.filter = merge(projectFilter, proc.filter || {});
 
-    // Prepare working directory before tests
-    tests.unshift(prepareWorkingDirectory.bind(null, process));
+    var scripts = merge(config.scripts || {}, proc.scripts || {});
+    var cwd = merge(config.cwd || {}, proc.cwd || {});
 
-    gith(process.filter).on(process.event || 'all', function (payload) {
+    var passActions = getActions(proc, 'pass');
+    var failActions = getActions(proc, 'fail');
+    var errorActions = getActions(proc, 'error');
+
+    gith(proc.filter).on(proc.event || 'all', function (payload) {
 
       var output = new Buffer(0);
       var appendOutput = function (params) {
@@ -81,7 +88,16 @@ fs.readdirSync(path.join(__dirname, 'projects'))
         console.error('FINISHED', project, output, arguments);
       };
 
-      async.series(tests.map(appendOutput([payload])), function (err, results) {
+      async.series([
+        prepareWorkingDirectory.bind(null, proc, payload),
+        function test (cb) {
+          var dir = path.join(proc.projectDir, 'git');
+          utils.shSeries(proc, payload, dir, scripts.test || 'echo "NO TEST DEFINED"', function (err, outputs) {
+            output = Buffer.concat([output, content, new Buffer('\n')]);
+            cb(err);
+          });
+        }
+      ], function (err) {
         var actions;
         if (err) {
           actions = errorActions;
@@ -107,14 +123,12 @@ fs.readdirSync(path.join(__dirname, 'projects'))
 });
 
 
-var shell_exec = require('./lib/utils').shell_exec;
-
 function prepareWorkingDirectory (config, payload, cb) {
   var dir = path.join(config.projectDir, 'git');
 
   var output = new Buffer(0);
   var doSpawn = function (command, args, cb) {
-    shell_exec(dir, command, args, function (err, content) {
+    utils.shSeries(config, payload, dir, [[command, args]], function (err, content) {
       output = Buffer.concat([output, content, new Buffer('\n')]);
       cb(err);
     });
