@@ -10,7 +10,11 @@ var tests = require('./lib/tests');
 var actions = require('./lib/actions');
 
 
-fs.readdirSync(path.join(__dirname, 'projects')).forEach(function (project) {
+fs.readdirSync(path.join(__dirname, 'projects'))
+.filter(function (project) {
+  return fs.statSync(path.join(__dirname, 'projects', project)).isDirectory();
+})
+.forEach(function (project) {
   console.log('Read config for project', project);
   var config;
   try {
@@ -95,4 +99,6 @@ fs.readdirSync(path.join(__dirname, 'projects')).forEach(function (project) {
       });
     });
   });
+
+  console.log('Listening on port', process.env.PORT || 9001);
 });
