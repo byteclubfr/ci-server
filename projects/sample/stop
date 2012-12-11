@@ -1,14 +1,16 @@
 #!/bin/sh
 
-PIDFILE="$(dirname "$0")/PID"
+PIDFILE="$(readlink -f "$(dirname "$0")")/PID"
 
-if [ -f $PIDFILE ]; then
-	if (kill -15 $(cat $PIDFILE) &> /dev/null); then
+
+
+if [ -f "$PIDFILE" ]; then
+	if (kill -15 $(cat "$PIDFILE") &> /dev/null); then
 		echo "Server terminated successfully!" >&2
-		rm -f $PIDFILE
+		rm -f "$PIDFILE"
 		exit 0
 	else
-		echo "Failed terminating server with SIGTERM, please check and manually kill PID $(cat $PIDFILE)" >&2
+		echo "Failed terminating server with SIGTERM, please check and manually kill PID $(cat "$PIDFILE")" >&2
 		exit 2
 	fi
 else

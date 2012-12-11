@@ -1,10 +1,15 @@
 #!/bin/sh
 
-PIDFILE="$(dirname "$0")/PID"
+PIDFILE="$(readlink -f "$(dirname "$0")")/PID"
+PROJECT="/path/to/project"
+APP_ENV="NODE_ENV=production"
+APP_START="node app.js"
 
-if [ -f $PIDFILE ]; then
+
+
+if [ -f "$PIDFILE" ]; then
 	echo "Found PIDFILE, server already running?" >&2
-	if (kill -0 $(cat $PIDFILE) &> /dev/null); then
+	if (kill -0 $(cat "$PIDFILE") &> /dev/null); then
 		echo "Server already running!" >&2
 		exit 1
 	else
@@ -13,15 +18,15 @@ if [ -f $PIDFILE ]; then
 	fi
 fi
 
-cd /path/to/project
+cd "$PROJECT"
 
-NODE_ENV=production nohup node app.js &> log/production.log &
+eval $APP_ENV nohup \"$APP_START\" &> log/production.log &
 PID=$!
 
 sleep 1
 
 if (kill -0 $PID &> /dev/null); then
-	echo $PID > $PIDFILE
+	echo $PID > "$PIDFILE"
 	echo "Server started successfully (PID $PID)" >&2
 	exit 0
 else
