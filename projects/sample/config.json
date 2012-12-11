@@ -6,7 +6,9 @@
 	"scripts": {
 		"build": "npm install && npm update",
 		"test": "npm test",
-		"deploy": "cd /path/to/project && $GIT_UPDATE && $PROJECT/stop && $PROJECT/start"
+		"deploy.before": "$PROJECT/stop",
+		"deploy.after": "$PROJECT/start",
+		"deploy.cwd": "/path/to/project",
 	},
 	"processes": [
 		{

@@ -62,8 +62,7 @@ fs.readdirSync(path.join(__dirname, 'projects'))
     proc.projectDir = path.join(__dirname, 'projects', project);
     proc.filter = merge(projectFilter, proc.filter || {});
 
-    var scripts = merge(config.scripts || {}, proc.scripts || {});
-    var cwd = merge(config.cwd || {}, proc.cwd || {});
+    proc.scripts = merge(config.scripts || {}, proc.scripts || {});
 
     var passActions = getActions(proc, 'pass');
     var failActions = getActions(proc, 'fail');
@@ -74,31 +73,36 @@ fs.readdirSync(path.join(__dirname, 'projects'))
       var output = new Buffer(0);
       var appendOutput = function (params) {
         return function (fn) {
-          fn = fn.bind(null, params);
           return function (cb) {
-            fn(function () {
+            fn.apply(null, params.concat([function () {
               var args = Array.prototype.slice.call(arguments);
-              output = Buffer.concat([output, args.pop(), new Buffer('\n')]);
+              if (args.length > 1) {
+                output = Buffer.concat([output, args.pop(), new Buffer('\n')]);
+              }
               cb.apply(null, args);
-            });
+            }]));
           };
         };
       };
 
-      var finished = function finished () {
-        console.error('FINISHED', project, output, arguments);
+      var finished = function finished (err) {
+        console.error('FINISHED', project, err, output.toString());
       };
 
-      async.series([
-        prepareWorkingDirectory.bind(null, proc, payload),
-        function test (cb) {
-          var dir = path.join(proc.projectDir, 'git');
-          utils.sh(dir, utils.replaceShellTokens(proc, payload, scripts.test || 'echo "NO TEST DEFINED"'), function (err, content) {
+      var befores = [prepareWorkingDirectory.bind(null, proc, payload)];
+      var addBefore = function (script) {
+        if (!proc.scripts[script]) return;
+        befores.push(function (cb) {
+          utils.sh(path.join(proc.projectDir, 'git'), utils.replaceShellTokens(proc, payload, proc.scripts[script]), function (err, content) {
             output = Buffer.concat([output, content, new Buffer('\n')]);
             cb(err);
           });
-        }
-      ], function (err) {
+        });
+      };
+      addBefore('build');
+      addBefore('test');
+
+      async.series(befores, function (err) {
         var actions = err ? failActions : passActions;
         async.series(actions.map(appendOutput([payload, err])), function (err, results) {
           if (err) {
