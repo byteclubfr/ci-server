@@ -4,8 +4,8 @@
 		"repo": "user/project"
 	},
 	"scripts": {
-		"build": "npm install && npm update",
-		"test": "npm test",
+		"test": "npm install -d && npm update && npm test",
+		"deploy.build": "npm install && npm update",
 		"deploy.before": "$PROJECT/stop",
 		"deploy.after": "$PROJECT/start",
 		"deploy.cwd": "/path/to/project",
