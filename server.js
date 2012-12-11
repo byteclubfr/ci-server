@@ -89,20 +89,15 @@ fs.readdirSync(path.join(__dirname, 'projects'))
         console.error('FINISHED', project, err, output.toString());
       };
 
-      var befores = [prepareWorkingDirectory.bind(null, proc, payload)];
-      var addBefore = function (script) {
-        if (!proc.scripts[script]) return;
-        befores.push(function (cb) {
-          utils.sh(path.join(proc.projectDir, 'git'), utils.replaceShellTokens(proc, payload, proc.scripts[script]), function (err, content) {
+      async.series([
+        prepareWorkingDirectory.bind(null, proc, payload),
+        function test (cb) {
+          utils.sh(path.join(proc.projectDir, 'git'), utils.replaceShellTokens(proc, payload, proc.scripts.test), function (err, content) {
             output = Buffer.concat([output, content, new Buffer('\n')]);
             cb(err);
           });
-        });
-      };
-      addBefore('build');
-      addBefore('test');
-
-      async.series(befores, function (err) {
+        }
+      ], function (err) {
         var actions = err ? failActions : passActions;
         async.series(actions.map(appendOutput([payload, err])), function (err, results) {
           if (err) {
@@ -159,7 +154,10 @@ function prepareWorkingDirectory (config, payload, cb) {
             // Prefer the SSH git protocol, using deploy key
             url = url.replace(/^https?:\/\/(.*?)\//, 'git@$1:') + '.git';
           }
-          doSpawn('git clone ' + utils.shellArgs([url, dir]), cb);
+          var old_dir = dir;
+          dir = null;
+          doSpawn('git clone ' + utils.shellArgs([url, old_dir]), cb);
+          dir = old_dir;
         }
       }
     },
